@@ -1,0 +1,8 @@
+ur5:
+    EndEffector:
+        position: [0, 0, 0.03]
+        orientation: [0, 0, 0]
+    JointInfo:
+        RobotBaseJoint: []
+        RobotMovableJoint: [0, 1, 2, 3, 4, 5]
+        RobotEEJoint: []
