@@ -39,13 +39,17 @@ class PinocchioModel:
         if len(self.RobotEEJointIdx) == 0:
             self.RobotEEJointIdx = [self.RobotMovableJointIdx[-1]]
 
+        # Robot's base coordinate in world coordinate
         self._T_W0 = T_W0
         self._Ad_W0 = Adjoint(self._T_W0)
 
+        # Load pinocchio model
         self.pinModel = pin.buildModelFromUrdf(urdf_dir + "/../{}/model.urdf".format(self._robot_type))
-            
         self.pinData = self.pinModel.createData()
         self.numJoints = self.pinModel.nq
+
+        if self.numJoints != len(self.RobotMovableJointIdx):
+            raise Exception("Wrong number of movable joints!")
 
         pin.forwardKinematics(self.pinModel, self.pinData, np.zeros([self.numJoints, 1]))
         pin.updateFramePlacements(self.pinModel, self.pinData)
@@ -55,22 +59,17 @@ class PinocchioModel:
         pin.forwardKinematics(self.pinModel, self.pinData, np.asarray(q).reshape([-1, 1]))
         pin.updateFramePlacements(self.pinModel, self.pinData)
         # return self._T_W0 @ self.pinData.oMi[self.numJoints].np @ self._T_CoME
+        # 2 [ground link + joint] + 2*(TCP index) [robot link + joint]
         return self._T_W0 @ self.pinData.oMf[2+2*(self.RobotEEJointIdx[0]+1)].np @ self._T_CoME
 
 
     def Js(self, q):
         pin.forwardKinematics(self.pinModel, self.pinData, np.asarray(q).reshape([-1, 1]))
         J = pin.computeJointJacobians(self.pinModel, self.pinData)
-        return self._Ad_W0 @ J[[3, 4, 5, 0, 1, 2], :]
+        return self._Ad_W0 @ J[[3, 4, 5, 0, 1, 2], :] # [Jv; Jw] to [Jw; Jv]
 
     def Jb(self, q):
         return Adjoint(TransInv(self.FK(q))) @ self.Js(q)
-
-    def Js_dot(self, q):
-        pass
-
-    def Jb_dot(self, q):
-        pass
 
     def Minv(self, q):
         return pin.computeMinverse(self.pinModel, self.pinData, np.asarray(q).reshape([-1, 1]))

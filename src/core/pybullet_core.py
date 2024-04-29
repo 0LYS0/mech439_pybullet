@@ -20,9 +20,8 @@ from src.utils import *
 from src.core.pybullet_robot import PybulletRobot
 
 class PybulletCore:
-    """Pybullet Simulator Core Class
-
-    :param string scene_info: filename of scene configuration yaml file
+    """
+    Pybullet Simulator Core Class
     """
     def __init__(self):
 
@@ -40,12 +39,13 @@ class PybulletCore:
 
         self.dt = 1. / 240  # Simulation Frequency
 
-
-
-
-    def connect(self, robot_name = 'indyRP2', joint_limit = True, constraint_visualization = True):
+    def connect(self, robot_name = 'indy7_v2', joint_limit=True, constraint_visualization=True):
         """
         Connect to Pybullet GUI
+
+        :param string robot_name: robot name want to import, defaults to 'indy7_v2'
+        :param bool joint_limit: activate/deactivate the joint limit constraint, defaults to True
+        :param bool constraint_visualization: activate/deactivate the constraint visualizer, defaults to True
         """
 
         # Open GUI
@@ -108,7 +108,7 @@ class PybulletCore:
 
     def _thread_main(self):
         """
-        Disconnect to Pybullet GUI
+        Core thread of pybullet simulation framework
         """
         while True:
             ts = time.time()
@@ -126,20 +126,29 @@ class PybulletCore:
                 time.sleep(self.dt-tf+ts)
 
     def _thread_pre(self):
+        """
+        This method is called at the beginning of _thread_main.
+        """
         pass
 
     def _thread_post(self):
+        """
+        This method is called at the end of _thread_main.
+        """
         pass
     
     # For jupyter notebook
-    def MoveRobot(self, angle, degrees=True, verbose=False):
-        
-        if degrees:
-            angle = deg2radlist(angle)
+    def MoveRobot(self, q, degrees=True, verbose=False):
+        """
+        Move the robot to the given joint angle
+        """
 
-        self.my_robot.reset_joint_pos(angle)
+        if degrees:
+            q = deg2radlist(q)
+
+        self.my_robot.reset_joint_pos(q)
 
         if (verbose == True):
             PRINT_BLUE("***** Set desired joint angle *****")
-            print(np.asarray(angle).reshape(-1))
+            print(np.asarray(q).reshape(-1))
     
