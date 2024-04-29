@@ -80,10 +80,10 @@ class PybulletRobot:
         """
 
         # Load robot
-        self._load_robot()
+        self._import_robot()
 
 
-    def _load_robot(self):
+    def _import_robot(self):
         """
         This method is protected method of pybulletRobot class which load robot's information from yaml file
 
@@ -100,6 +100,7 @@ class PybulletRobot:
         self._is_joint_limit = self._robot_info["robot_properties"]["joint_limit"]
         self._is_constraint_visualization = self._robot_info["robot_properties"]["constraint_visualization"]
 
+        # Search urdf file
         available_robot_types = get_subdirectories(self.__urdfpath)
         load_success = False
         for robot_type in available_robot_types:
@@ -124,7 +125,7 @@ class PybulletRobot:
             PRINT_BLACK("Robot type", self.robot_type)
             return
 
-        # Import robot
+        # Import robot in PyBullet
         flags = p.URDF_USE_INERTIA_FROM_FILE + p.URDF_USE_SELF_COLLISION + p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT
         urdf_dir = self.__urdfpath + "/{0}/{1}".format(self.robot_type, self.robot_name)
         urdf_path = urdf_dir + "/model.urdf"
@@ -133,7 +134,7 @@ class PybulletRobot:
                                   flags=flags, physicsClientId=self.ClientId)
 
 
-        # Get robot's info from robot_info.yaml file
+        # Get robot's properties from the robot_info.yaml file
         self.RobotBaseJointIdx = self._robot_configs[self.robot_name]["JointInfo"]["RobotBaseJoint"]
         self.RobotMovableJointIdx = self._robot_configs[self.robot_name]["JointInfo"]["RobotMovableJoint"]
         self.RobotEEJointIdx = self._robot_configs[self.robot_name]["JointInfo"]["RobotEEJoint"]
@@ -143,25 +144,25 @@ class PybulletRobot:
         if len(self.RobotEEJointIdx) == 0:
             self.RobotEEJointIdx = [self.RobotMovableJointIdx[-1]]
 
+        # Get robot base's pose
         state = p.getBasePositionAndOrientation(self.robotId, physicsClientId=self.ClientId)
-        T_wr = xyzquat2SE3(state[0], state[1])
+        T_wg = xyzquat2SE3(state[0], state[1]) # world to ground
         if self.RobotBaseJointIdx[0] == -1:
             state = p.getBasePositionAndOrientation(self.robotId, physicsClientId=self.ClientId)
         else:
             state = p.getLinkState(self.robotId, self.RobotBaseJointIdx[0], physicsClientId=self.ClientId)
-        T_wb = xyzquat2SE3(state[0], state[1])
+        T_wb = xyzquat2SE3(state[0], state[1]) # world to base
 
-        self._T_rb = TransInv(T_wr) @ T_wb  # pose of robot's base frame in robot's root frame
+        self._T_gb = TransInv(T_wg) @ T_wb  # pose of robot's base frame in robot's ground frame
 
         # Get pinocchio model to compute robot's dynamics & kinematics
-        self.pinModel = PinocchioModel(urdf_dir, self._base_SE3 @ self._T_rb)
+        self.pinModel = PinocchioModel(urdf_dir, self._base_SE3 @ self._T_gb)
 
         # set robot's number of bodies and number of joints
         self._numBodies = 1 + p.getNumJoints(self.robotId, self.ClientId)
         self._numJoints = len(self.RobotMovableJointIdx)
 
-        self._GraspObjectId = None
-
+        # Unlock joint limit
         if self._is_joint_limit is False:
             for idx in self.RobotMovableJointIdx:
                 p.changeDynamics(self.robotId, idx, jointLowerLimit=-314, jointUpperLimit=314,
@@ -173,7 +174,7 @@ class PybulletRobot:
         for data in visual_data:
             self._robot_color[data[1]+1] = data[7]
 
-        self._initialize_robot()
+        self._init_robot_parameters()
 
         PRINT_BLUE("******** ROBOT INFO ********")
         PRINT_BLACK("Robot name", self.robot_name)
@@ -211,7 +212,7 @@ class PybulletRobot:
         return self._numBodies
 
     # Get robot's information
-    def _initialize_robot(self):
+    def _init_robot_parameters(self):
 
         # Robot's states
         self._q = np.zeros([self.numJoints, 1])        # position of joints (rad)
@@ -226,8 +227,6 @@ class PybulletRobot:
         self._Jb = np.zeros([6, self.numJoints])      # Body jacobian matrix.
         self._Jsinv = np.zeros([self.numJoints, 6])   # Inverse of spatial jacobian matrix
         self._Jbinv = np.zeros([self.numJoints, 6])   # Inverse of body jacobian matrix
-        self._Jsdot = np.zeros([6, self.numJoints])   # Time-derivative of spatial jacobian matrix
-        self._Jbdot = np.zeros([6, self.numJoints])   # Time-derivative of body jacobian matrix
 
         self._M = np.zeros([self.numJoints, self.numJoints])  # Mass matrix of robot
         self._C = np.zeros([self.numJoints, self.numJoints])  # Coriolis matrix of robot
@@ -235,7 +234,7 @@ class PybulletRobot:
         self._g = np.zeros([self.numJoints, 1])               # Gravity vector of robot
         self._tau = np.zeros([self.numJoints, 1])             # Input torque (N*m)
 
-        self._p = np.zeros([6, 1])      # End-effector's pose (xyz, xi_dot)
+        self._p = np.zeros([6, 1])      # End-effector's pose (xyz, xi)
         self._T_end = np.zeros([4, 4])   # End-effector's pose in SE3
 
         # Constraint & flag
@@ -307,19 +306,8 @@ class PybulletRobot:
 
         self._p = SE32PoseVec(self._T_end)
 
-        self._update_base_pose()
-
         p.resetBasePositionAndOrientation(bodyUniqueId=self._endID, posObj=self._p[0:3, 0],
                                           ornObj=Rot2quat(self._T_end[0:3, 0:3]), physicsClientId=self.ClientId)
-        
-    def _update_base_pose(self):
-
-        state = p.getBasePositionAndOrientation(self.robotId, physicsClientId=self.ClientId)
-
-        self._base_pos = state[0]
-        self._base_quat = state[-1]
-        self._base_SE3 = xyzquat2SE3(self._base_pos, self._base_quat)
-        self.pinModel.reset_base(self._base_SE3 @ self._T_rb)
 
     def _compute_torque_input(self):
 
