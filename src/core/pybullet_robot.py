@@ -251,8 +251,10 @@ class PybulletRobot:
 
         self._Js = np.zeros([6, self.numJoints])      # Spatial jacobian matrix.
         self._Jb = np.zeros([6, self.numJoints])      # Body jacobian matrix.
+        self._Jr = np.zeros([6, self.numJoints])      # Jacobian matrix.
         self._Jsinv = np.zeros([self.numJoints, 6])   # Inverse of spatial jacobian matrix
         self._Jbinv = np.zeros([self.numJoints, 6])   # Inverse of body jacobian matrix
+        self._Jrinv = np.zeros([self.numJoints, 6])   # Inverse of jacobian matrix
 
         self._M = np.zeros([self.numJoints, self.numJoints])  # Mass matrix of robot
         self._C = np.zeros([self.numJoints, self.numJoints])  # Coriolis matrix of robot
@@ -306,6 +308,14 @@ class PybulletRobot:
         self._g = self.pinModel.g(self._q)
 
         self._p = SE32PoseVec(self._T_end)
+
+        R_end = self._T_end[0:3, 0:3]
+        A_upper = np.concatenate((np.zeros([3, 3]), R_end), axis=1)
+        A_lower = np.concatenate((np.eye(3), np.zeros([3, 3])), axis=1)
+        A = np.concatenate((A_upper, A_lower), axis=0)
+
+        self._Jr = A @ self._Jb
+        self._Jrinv = np.linalg.pinv(self._Jr)
 
         p.resetBasePositionAndOrientation(bodyUniqueId=self._endID, posObj=self._p[0:3, 0],
                                           ornObj=Rot2quat(self._T_end[0:3, 0:3]), physicsClientId=self.ClientId)
@@ -367,7 +377,7 @@ class PybulletRobot:
     def p(self):
         """
         :return: robot's current task pose (xyz, xi)
-        :rtype: np.ndarray (n-by-1)
+        :rtype: np.ndarray (6-by-1)
         """
         return self._p.copy()
 
@@ -403,6 +413,14 @@ class PybulletRobot:
         """
         return self._Jb.copy()
 
+    @property
+    def Jr(self):
+        """
+        :return: Jacobian in robot's current configuration
+        :rtype: np.ndarray (6-by-n)
+        """
+        return self._Jr.copy()
+
     def JsInv(self):
         """
         :return: Inverse of the spatial jacobian in robot's current configuration
@@ -416,6 +434,14 @@ class PybulletRobot:
         :rtype: np.ndarray (n-by-6)
         """
         return self._Jbinv.copy()
+
+    @property
+    def Jrinv(self):
+        """
+        :return: Inverse of the jacobian in robot's current configuration
+        :rtype: np.ndarray (6-by-n)
+        """
+        return self._Jrinv.copy()
 
     @property
     def M(self):
@@ -588,6 +614,18 @@ class PybulletRobot:
 
         Jb = np.zeros([6, self.numJoints])
         return Jb
+
+    def jacobian(self, q):
+        # Implement this function!
+        """
+        :param np.ndarray q: given robot joint position (rad)
+
+        :return: jacobian in given configuration
+        :rtype: np.ndarray (6-by-n)
+        """
+
+        Jr = np.zeros([6, self.numJoints])
+        return Jr
 
     def forward_kinematics(self, q):
         # Implement this function!

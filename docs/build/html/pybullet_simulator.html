@@ -63,8 +63,10 @@
 <li class="toctree-l3"><a class="reference internal" href="#src.core.pybullet_robot.PybulletRobot.tau"><code class="docutils literal notranslate"><span class="pre">PybulletRobot.tau</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#src.core.pybullet_robot.PybulletRobot.Js"><code class="docutils literal notranslate"><span class="pre">PybulletRobot.Js</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#src.core.pybullet_robot.PybulletRobot.Jb"><code class="docutils literal notranslate"><span class="pre">PybulletRobot.Jb</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#src.core.pybullet_robot.PybulletRobot.Jr"><code class="docutils literal notranslate"><span class="pre">PybulletRobot.Jr</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#src.core.pybullet_robot.PybulletRobot.JsInv"><code class="docutils literal notranslate"><span class="pre">PybulletRobot.JsInv()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#src.core.pybullet_robot.PybulletRobot.Jbinv"><code class="docutils literal notranslate"><span class="pre">PybulletRobot.Jbinv()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#src.core.pybullet_robot.PybulletRobot.Jrinv"><code class="docutils literal notranslate"><span class="pre">PybulletRobot.Jrinv</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#src.core.pybullet_robot.PybulletRobot.M"><code class="docutils literal notranslate"><span class="pre">PybulletRobot.M</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#src.core.pybullet_robot.PybulletRobot.C"><code class="docutils literal notranslate"><span class="pre">PybulletRobot.C</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#src.core.pybullet_robot.PybulletRobot.c"><code class="docutils literal notranslate"><span class="pre">PybulletRobot.c</span></code></a></li>
@@ -73,6 +75,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#src.core.pybullet_robot.PybulletRobot.q_upper"><code class="docutils literal notranslate"><span class="pre">PybulletRobot.q_upper</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#src.core.pybullet_robot.PybulletRobot.spatial_jacobian"><code class="docutils literal notranslate"><span class="pre">PybulletRobot.spatial_jacobian()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#src.core.pybullet_robot.PybulletRobot.body_jacobian"><code class="docutils literal notranslate"><span class="pre">PybulletRobot.body_jacobian()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#src.core.pybullet_robot.PybulletRobot.jacobian"><code class="docutils literal notranslate"><span class="pre">PybulletRobot.jacobian()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#src.core.pybullet_robot.PybulletRobot.forward_kinematics"><code class="docutils literal notranslate"><span class="pre">PybulletRobot.forward_kinematics()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#src.core.pybullet_robot.PybulletRobot.inverse_kinematics"><code class="docutils literal notranslate"><span class="pre">PybulletRobot.inverse_kinematics()</span></code></a></li>
 </ul>
@@ -229,7 +232,7 @@ _control_robot, and _post_robot_update methods.</p>
 <dd class="field-odd"><p>robot’s current task pose (xyz, xi)</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p>np.ndarray (n-by-1)</p>
+<dd class="field-even"><p>np.ndarray (6-by-1)</p>
 </dd>
 </dl>
 </dd></dl>
@@ -286,6 +289,19 @@ _control_robot, and _post_robot_update methods.</p>
 </dl>
 </dd></dl>
 
+<dl class="py property">
+<dt class="sig sig-object py" id="src.core.pybullet_robot.PybulletRobot.Jr">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Jr</span></span><a class="headerlink" href="#src.core.pybullet_robot.PybulletRobot.Jr" title="Permalink to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Jacobian in robot’s current configuration</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>np.ndarray (6-by-n)</p>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="src.core.pybullet_robot.PybulletRobot.JsInv">
 <span class="sig-name descname"><span class="pre">JsInv</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#src.core.pybullet_robot.PybulletRobot.JsInv" title="Permalink to this definition"></a></dt>
@@ -308,6 +324,19 @@ _control_robot, and _post_robot_update methods.</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p>np.ndarray (n-by-6)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="src.core.pybullet_robot.PybulletRobot.Jrinv">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Jrinv</span></span><a class="headerlink" href="#src.core.pybullet_robot.PybulletRobot.Jrinv" title="Permalink to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Inverse of the jacobian in robot’s current configuration</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>np.ndarray (6-by-n)</p>
 </dd>
 </dl>
 </dd></dl>
@@ -415,6 +444,22 @@ _control_robot, and _post_robot_update methods.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>body jacobian in given configuration</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray (6-by-n)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.core.pybullet_robot.PybulletRobot.jacobian">
+<span class="sig-name descname"><span class="pre">jacobian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">q</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#src.core.pybullet_robot.PybulletRobot.jacobian" title="Permalink to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>q</strong> (<em>np.ndarray</em>) – given robot joint position (rad)</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>jacobian in given configuration</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>np.ndarray (6-by-n)</p>
