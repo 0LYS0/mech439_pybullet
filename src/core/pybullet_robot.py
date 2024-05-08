@@ -26,7 +26,8 @@ def get_subdirectories(path):
 
 
 class PybulletRobot:
-    """Pybullet Simulator Robot Class
+    """
+    Pybullet Simulator Robot Class
 
     :param int ClientId: pybullet GUI client's ID
     :param dict[] robot_info: dictionary of robot's information
@@ -80,14 +81,20 @@ class PybulletRobot:
         """
 
         # Load robot
-        self._load_robot()
+        self._import_robot()
+        self._init_robot_parameters()
+
+        PRINT_BLUE("******** ROBOT INFO ********")
+        PRINT_BLACK("Robot name", self.robot_name)
+        PRINT_BLACK("Robot type", self.robot_type)
+        PRINT_BLACK("DOF", self.numJoints)
+        PRINT_BLACK("Joint limit", self._is_joint_limit)
+        PRINT_BLACK("Constraint visualization", self._is_constraint_visualization)
 
 
-    def _load_robot(self):
+    def _import_robot(self):
         """
         This method is protected method of pybulletRobot class which load robot's information from yaml file
-
-        :return:
         """
 
         # Get robot configuration
@@ -100,6 +107,7 @@ class PybulletRobot:
         self._is_joint_limit = self._robot_info["robot_properties"]["joint_limit"]
         self._is_constraint_visualization = self._robot_info["robot_properties"]["constraint_visualization"]
 
+        # Search urdf file
         available_robot_types = get_subdirectories(self.__urdfpath)
         load_success = False
         for robot_type in available_robot_types:
@@ -124,7 +132,7 @@ class PybulletRobot:
             PRINT_BLACK("Robot type", self.robot_type)
             return
 
-        # Import robot
+        # Import robot in PyBullet
         flags = p.URDF_USE_INERTIA_FROM_FILE + p.URDF_USE_SELF_COLLISION + p.URDF_USE_SELF_COLLISION_EXCLUDE_PARENT
         urdf_dir = self.__urdfpath + "/{0}/{1}".format(self.robot_type, self.robot_name)
         urdf_path = urdf_dir + "/model.urdf"
@@ -133,7 +141,7 @@ class PybulletRobot:
                                   flags=flags, physicsClientId=self.ClientId)
 
 
-        # Get robot's info from robot_info.yaml file
+        # Get robot's properties from the robot_info.yaml file
         self.RobotBaseJointIdx = self._robot_configs[self.robot_name]["JointInfo"]["RobotBaseJoint"]
         self.RobotMovableJointIdx = self._robot_configs[self.robot_name]["JointInfo"]["RobotMovableJoint"]
         self.RobotEEJointIdx = self._robot_configs[self.robot_name]["JointInfo"]["RobotEEJoint"]
@@ -143,25 +151,25 @@ class PybulletRobot:
         if len(self.RobotEEJointIdx) == 0:
             self.RobotEEJointIdx = [self.RobotMovableJointIdx[-1]]
 
+        # Get robot base's pose
         state = p.getBasePositionAndOrientation(self.robotId, physicsClientId=self.ClientId)
-        T_wr = xyzquat2SE3(state[0], state[1])
+        T_wg = xyzquat2SE3(state[0], state[1]) # world to ground
         if self.RobotBaseJointIdx[0] == -1:
             state = p.getBasePositionAndOrientation(self.robotId, physicsClientId=self.ClientId)
         else:
             state = p.getLinkState(self.robotId, self.RobotBaseJointIdx[0], physicsClientId=self.ClientId)
-        T_wb = xyzquat2SE3(state[0], state[1])
+        T_wb = xyzquat2SE3(state[0], state[1]) # world to base
 
-        self._T_rb = TransInv(T_wr) @ T_wb  # pose of robot's base frame in robot's root frame
+        self._T_gb = TransInv(T_wg) @ T_wb  # pose of robot's base frame in robot's ground frame
 
         # Get pinocchio model to compute robot's dynamics & kinematics
-        self.pinModel = PinocchioModel(urdf_dir, self._base_SE3 @ self._T_rb)
+        self.pinModel = PinocchioModel(urdf_dir, self._base_SE3 @ self._T_gb)
 
         # set robot's number of bodies and number of joints
         self._numBodies = 1 + p.getNumJoints(self.robotId, self.ClientId)
         self._numJoints = len(self.RobotMovableJointIdx)
 
-        self._GraspObjectId = None
-
+        # Unlock joint limit
         if self._is_joint_limit is False:
             for idx in self.RobotMovableJointIdx:
                 p.changeDynamics(self.robotId, idx, jointLowerLimit=-314, jointUpperLimit=314,
@@ -173,14 +181,31 @@ class PybulletRobot:
         for data in visual_data:
             self._robot_color[data[1]+1] = data[7]
 
-        self._initialize_robot()
+        # Add end-effector coordinate frame visualizer
+        visualShapeId = p.createVisualShape(shapeType=p.GEOM_SPHERE, radius=0.01, rgbaColor=[0, 1, 0, 0.7],
+                                            physicsClientId=self.ClientId)
 
-        PRINT_BLUE("******** ROBOT INFO ********")
-        PRINT_BLACK("Robot name", self.robot_name)
-        PRINT_BLACK("Robot type", self.robot_type)
-        PRINT_BLACK("DOF", self.numJoints)
-        PRINT_BLACK("Joint limit", self._is_joint_limit)
-        PRINT_BLACK("Constraint visualization", self._is_constraint_visualization)
+        self._endID = p.createMultiBody(baseVisualShapeIndex=visualShapeId, basePosition=[0, 0, 0],
+                                        baseOrientation=[0, 0, 0, 1], physicsClientId=self.ClientId)
+
+        self._endID_x = p.addUserDebugLine(lineFromXYZ=[0, 0, 0], lineToXYZ=[0.05, 0, 0], lineColorRGB=[1, 0, 0],
+                                           lineWidth=2, parentObjectUniqueId=self._endID,
+                                           physicsClientId=self.ClientId)
+        self._endID_y = p.addUserDebugLine(lineFromXYZ=[0, 0, 0], lineToXYZ=[0, 0.05, 0], lineColorRGB=[0, 1, 0],
+                                           lineWidth=2, parentObjectUniqueId=self._endID,
+                                           physicsClientId=self.ClientId)
+        self._endID_z = p.addUserDebugLine(lineFromXYZ=[0, 0, 0], lineToXYZ=[0, 0, 0.05], lineColorRGB=[0, 0, 1],
+                                           lineWidth=2, parentObjectUniqueId=self._endID,
+                                           physicsClientId=self.ClientId)
+
+        # Remove the PyBullet's built-in position controller's effect
+        p.setJointMotorControlArray(bodyUniqueId=self.robotId,
+                                    jointIndices=self.RobotMovableJointIdx,
+                                    controlMode=p.POSITION_CONTROL,
+                                    targetPositions=[0] * self.numJoints,
+                                    forces=[0] * self.numJoints,
+                                    physicsClientId=self.ClientId
+                                    )
 
     @property
     def robot_name(self):
@@ -211,8 +236,10 @@ class PybulletRobot:
         return self._numBodies
 
     # Get robot's information
-    def _initialize_robot(self):
-
+    def _init_robot_parameters(self):
+        """
+        Initialize robot state variables and dynamic parameters
+        """
         # Robot's states
         self._q = np.zeros([self.numJoints, 1])        # position of joints (rad)
         self._qdot = np.zeros([self.numJoints, 1])     # velocity of joints (rad/s)
@@ -224,10 +251,10 @@ class PybulletRobot:
 
         self._Js = np.zeros([6, self.numJoints])      # Spatial jacobian matrix.
         self._Jb = np.zeros([6, self.numJoints])      # Body jacobian matrix.
+        self._Jr = np.zeros([6, self.numJoints])      # Jacobian matrix.
         self._Jsinv = np.zeros([self.numJoints, 6])   # Inverse of spatial jacobian matrix
         self._Jbinv = np.zeros([self.numJoints, 6])   # Inverse of body jacobian matrix
-        self._Jsdot = np.zeros([6, self.numJoints])   # Time-derivative of spatial jacobian matrix
-        self._Jbdot = np.zeros([6, self.numJoints])   # Time-derivative of body jacobian matrix
+        self._Jrinv = np.zeros([self.numJoints, 6])   # Inverse of jacobian matrix
 
         self._M = np.zeros([self.numJoints, self.numJoints])  # Mass matrix of robot
         self._C = np.zeros([self.numJoints, self.numJoints])  # Coriolis matrix of robot
@@ -235,7 +262,7 @@ class PybulletRobot:
         self._g = np.zeros([self.numJoints, 1])               # Gravity vector of robot
         self._tau = np.zeros([self.numJoints, 1])             # Input torque (N*m)
 
-        self._p = np.zeros([6, 1])      # End-effector's pose (xyz, xi_dot)
+        self._p = np.zeros([6, 1])       # End-effector's pose (xyz, xi)
         self._T_end = np.zeros([4, 4])   # End-effector's pose in SE3
 
         # Constraint & flag
@@ -258,29 +285,6 @@ class PybulletRobot:
             self._jointvel[idx] = jointInfo[10] * JOINT_SAFETY_FACTOR
             self._jointforce[idx] = jointInfo[11] * JOINT_SAFETY_FACTOR
 
-        # Add end-effector
-        visualShapeId = p.createVisualShape(shapeType=p.GEOM_SPHERE, radius=0.01, rgbaColor=[0, 1, 0, 0.7],
-                                            physicsClientId=self.ClientId)
-
-        self._endID = p.createMultiBody(baseVisualShapeIndex=visualShapeId, basePosition=[0, 0, 0],
-                                        baseOrientation=[0, 0, 0 ,1], physicsClientId=self.ClientId)
-
-        self._endID_x = p.addUserDebugLine(lineFromXYZ=[0, 0, 0], lineToXYZ=[0.05, 0, 0], lineColorRGB=[1, 0, 0],
-                                           lineWidth=2, parentObjectUniqueId=self._endID, physicsClientId=self.ClientId)
-        self._endID_y = p.addUserDebugLine(lineFromXYZ=[0, 0, 0], lineToXYZ=[0, 0.05, 0], lineColorRGB=[0, 1, 0],
-                                           lineWidth=2, parentObjectUniqueId=self._endID, physicsClientId=self.ClientId)
-        self._endID_z = p.addUserDebugLine(lineFromXYZ=[0, 0, 0], lineToXYZ=[0, 0, 0.05], lineColorRGB=[0, 0, 1],
-                                           lineWidth=2, parentObjectUniqueId=self._endID, physicsClientId=self.ClientId)
-
-        # Remove the PyBullet's built-in position controller's effect
-        p.setJointMotorControlArray(bodyUniqueId=self.robotId,
-                                    jointIndices=self.RobotMovableJointIdx,
-                                    controlMode=p.POSITION_CONTROL,
-                                    targetPositions=[0] * self.numJoints,
-                                    forces=[0] * self.numJoints,
-                                    physicsClientId=self.ClientId
-                                    )
-
 
     def _get_robot_states(self):
 
@@ -295,8 +299,6 @@ class PybulletRobot:
 
         self._Js = self.pinModel.Js(self._q)
         self._Jb = self.pinModel.Jb(self._q)
-        self._Jsdot = np.zeros([6, self.numJoints])  # TODO
-        self._Jbdot = np.zeros([6, self.numJoints])  # TODO
         self._Jsinv = np.linalg.pinv(self._Js)
         self._Jbinv = np.linalg.pinv(self._Jb)
 
@@ -307,28 +309,23 @@ class PybulletRobot:
 
         self._p = SE32PoseVec(self._T_end)
 
-        self._update_base_pose()
+        R_end = self._T_end[0:3, 0:3]
+        A_upper = np.concatenate((np.zeros([3, 3]), R_end), axis=1)
+        A_lower = np.concatenate((np.eye(3), np.zeros([3, 3])), axis=1)
+        A = np.concatenate((A_upper, A_lower), axis=0)
+
+        self._Jr = A @ self._Jb
+        self._Jrinv = np.linalg.pinv(self._Jr)
 
         p.resetBasePositionAndOrientation(bodyUniqueId=self._endID, posObj=self._p[0:3, 0],
                                           ornObj=Rot2quat(self._T_end[0:3, 0:3]), physicsClientId=self.ClientId)
-        
-    def _update_base_pose(self):
-
-        state = p.getBasePositionAndOrientation(self.robotId, physicsClientId=self.ClientId)
-
-        self._base_pos = state[0]
-        self._base_quat = state[-1]
-        self._base_SE3 = xyzquat2SE3(self._base_pos, self._base_quat)
-        self.pinModel.reset_base(self._base_SE3 @ self._T_rb)
 
     def _compute_torque_input(self):
 
+        # You need to implement robot controllers here!
         if True:
-            Kp = 5000
-            Kd = 200
-
-            # Kp = 8000
-            # Kd = 400
+            Kp = 500
+            Kd = 20
 
             qddot = self._qddot_des + Kp * (self._q_des - self._q) + Kd * (self._qdot_des - self._qdot)
 
@@ -347,76 +344,166 @@ class PybulletRobot:
 
     @property
     def q(self):
+        """
+        :return: robot's current joint poses (rad)
+        :rtype: np.ndarray (n-by-1)
+        """
         return self._q.copy()
 
     @property
     def qdot(self):
+        """
+        :return: robot's current joint velocities (rad/s)
+        :rtype: np.ndarray (n-by-1)
+        """
         return self._qdot.copy()
 
     @property
     def qddot(self):
+        """
+        :return: [NOT WORK!!!] robot's current joint accelerations (rad/s^2)
+        :rtype: np.ndarray (n-by-1)
+        """
         return self._qddot.copy()
 
     @property
     def q_des(self):
+        """
+        :return: robot's desired joint poses (rad)
+        :rtype: np.ndarray (n-by-1)
+        """
         return self._q_des.copy()
 
     @property
     def p(self):
+        """
+        :return: robot's current task pose (xyz, xi)
+        :rtype: np.ndarray (6-by-1)
+        """
         return self._p.copy()
 
     @property
     def T_end(self):
+        """
+        :return: robot's current task pose (SE3)
+        :rtype: np.ndarray (4-by-4)
+        """
         return self._T_end.copy()
 
     @property
     def tau(self):
+        """
+        :return: robot's current input torques (Nm)
+        :rtype: np.ndarray (n-by-1)
+        """
         return self._tau.copy()
 
     @property
     def Js(self):
+        """
+        :return: Spatial jacobian in robot's current configuration
+        :rtype: np.ndarray (6-by-n)
+        """
         return self._Js.copy()
 
     @property
     def Jb(self):
+        """
+        :return: Body jacobian in robot's current configuration
+        :rtype: np.ndarray (6-by-n)
+        """
         return self._Jb.copy()
 
+    @property
+    def Jr(self):
+        """
+        :return: Jacobian in robot's current configuration
+        :rtype: np.ndarray (6-by-n)
+        """
+        return self._Jr.copy()
+
     def JsInv(self):
+        """
+        :return: Inverse of the spatial jacobian in robot's current configuration
+        :rtype: np.ndarray (n-by-6)
+        """
         return self._Jsinv.copy()
 
     def Jbinv(self):
+        """
+        :return: Inverse of the body jacobian in robot's current configuration
+        :rtype: np.ndarray (n-by-6)
+        """
         return self._Jbinv.copy()
 
     @property
+    def Jrinv(self):
+        """
+        :return: Inverse of the jacobian in robot's current configuration
+        :rtype: np.ndarray (6-by-n)
+        """
+        return self._Jrinv.copy()
+
+    @property
     def M(self):
+        """
+        :return: Mass matrix of the robot in robot's current configuration
+        :rtype: np.ndarray (n-by-n)
+        """
         return self._M.copy()
 
     @property
     def C(self):
+        """
+        :return: Coriolis matrix of the robot in robot's current configuration
+        :rtype: np.ndarray (n-by-n)
+        """
         return self._C.copy()
 
     @property
     def c(self):
+        """
+        :return: Coriolis vector of the robot in robot's current configuration
+        :rtype: np.ndarray (n-by-1)
+        """
         return self._c.copy()
 
     @property
     def g(self):
+        """
+        :return: Gravity vector of the robot in robot's current configuration
+        :rtype: np.ndarray (n-by-1)
+        """
         return self._g.copy()
 
     @property
     def q_lower(self):
+        """
+        :return: Lower joint pose limits (rad)
+        :rtype: np.ndarray (n-by-1)
+        """
         return self._jointpos_lower.copy()
 
     @property
     def q_upper(self):
+        """
+        :return: Upper joint pose limits (rad)
+        :rtype: np.ndarray (n-by-1)
+        """
         return self._jointpos_upper.copy()
 
-    # Utils
+    # Constraints visualization utils
     def _constraint_check(self):
         """
-        This method provide functions for check constraint.
-        It can check three kinds of limits, joint's position limits, joint's velocity limits, and collision.
-        If constraints aren't kept, the method will change the value of _jointpos_flag of each joint.
+        This method provide functions for check constraints.
+        It can check three kinds of limits: (i) joint's position limits, (ii) joint's velocity limits, (iii) and collision.
+        If constraints are not kept, the method will change the value _xxx_flag of each joint.
+        The value _xxx_flag will be used in _constraint_visualizer method to change the robot bodies' color.
+
+        0: false -> false
+        1: true -> false
+        2: false -> true
+        3: true -> true
         """
 
         # Joint position limit check
@@ -470,9 +557,8 @@ class PybulletRobot:
 
     def _constraint_visualizer(self):
         """
-        This method can display constraints of robot. If the constraints of robot aren't kept, the joint will be
-        shown in different color. The method distinguish if the constraints of robot are kept or not with joint
-        flags.
+        This method can visualize whether the robot violates the constraints.
+        If the robot violates the constraints, its color will be changed.
         """
         self._constraint_check()
 
@@ -505,51 +591,66 @@ class PybulletRobot:
                 p.changeVisualShape(objectUniqueId=self.robotId, linkIndex=idx-1, rgbaColor=self._robot_color[idx],
                                     physicsClientId=self.ClientId)
 
-    ### Kinematics utils
-    def body_jacobian(self, q, degree=False):
-        if degree:
-            q = np.asarray(q).reshape([self.numJoints, 1]) * np.pi/180
-        else:
-            q = np.asarray(q).reshape([self.numJoints, 1])
+    # Kinematics utils
+    # def spatial_jacobian(self, q):
+    #     # Implement this function!
+    #     """
+    #     :param np.ndarray q: given robot joint position (rad)
+    #
+    #     :return: spatial jacobian in given configuration
+    #     :rtype: np.ndarray (6-by-n)
+    #     """
+    #
+    #     Js = np.zeros([6, self.numJoints])
+    #     return Js
+    #
+    # def body_jacobian(self, q):
+    #     # Implement this function!
+    #     """
+    #     :param np.ndarray q: given robot joint position (rad)
+    #
+    #     :return: body jacobian in given configuration
+    #     :rtype: np.ndarray (6-by-n)
+    #     """
+    #
+    #     Jb = np.zeros([6, self.numJoints])
+    #     return Jb
 
-        return self.pinModel.Jb(q)
-
-    def forward_kinematics(self, q, degree=False):
-        if degree:
-            q = np.asarray(q).reshape([self.numJoints, 1]) * np.pi/180
-        else:
-            q = np.asarray(q).reshape([self.numJoints, 1])
-
-        return self.pinModel.FK(q)
-
-    def inverse_kinematics(self, T_goal, q_init=None):
+    def jacobian(self, q):
+        # Implement this function!
         """
-        This method set end effector's position to T_des.
+        :param np.ndarray q: given robot joint position (rad)
 
-        :param np.ndarray[2D] T_goal: The target pose of robot's EE in SE(3)
-        :param np.ndarray[1D] optional q_init: _description_, defaults to None
-        :return List[float], radian: _description_
+        :return: jacobian in given configuration
+        :rtype: np.ndarray (6-by-n)
         """
 
-        if q_init is None:
-            q_init = self.q.reshape(self.numJoints)
+        Jr = np.zeros([6, self.numJoints])
+        return Jr
 
-        try:
-            q_init.reshape(-1)
-        except:
-            pass
+    def forward_kinematics(self, q):
+        # Implement this function!
+        """
+        :param np.ndarray q: given robot joint position (rad)
 
-        return self.pinModel.CLIK(T_goal=T_goal, ql=self._jointpos_lower, qu=self._jointpos_upper, q_init=q_init)
+        :return: task pose corresponded to the given joint position (SE3)
+        :rtype: np.ndarray (4-by-4)
+        """
+        T = np.identity(4)
+        return T
+
+    def inverse_kinematics(self, T):
+        # Implement this function!
+        """
+        :param np.ndarray T: given robot target pose in SE3
+
+        :return: joint pos corresponded to the given task pose (rad)
+        :rtype: np.ndarray (n-by-1)
+        """
+        q = np.zeros([self.numJoints, 1])
+        return q
 
     # control utils
-    def reset_joint_pos(self, q_des):
+    def set_desired_joint_pos(self, q_des):
         q_des = np.asarray(q_des).reshape(-1, 1)
         self._q_des = q_des
-
-    def move_joint_pos(self, q_des):
-        # Implement this function!
-        pass
-
-    def move_task_pos(self, T_des):
-        # Implement this function!
-        pass

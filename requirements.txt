@@ -4,5 +4,7 @@ matplotlib
 jupyter
 pybullet
 
+neuromeka
+
 sphinx
 sphinx_rtd_theme

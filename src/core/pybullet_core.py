@@ -20,13 +20,14 @@ from src.utils import *
 from src.core.pybullet_robot import PybulletRobot
 
 class PybulletCore:
-    """Pybullet Simulator Core Class
-
-    :param string scene_info: filename of scene configuration yaml file
+    """
+    Pybullet Simulator Core Class
     """
     def __init__(self):
 
-        np.set_printoptions(precision=3)
+        np.set_printoptions(linewidth=500)
+        np.set_printoptions(suppress=True)
+        np.set_printoptions(precision=4)
 
         # Simulator configuration
         self.__filepath = os.path.dirname(os.path.abspath(__file__))
@@ -40,12 +41,13 @@ class PybulletCore:
 
         self.dt = 1. / 240  # Simulation Frequency
 
-
-
-
-    def connect(self, robot_name = 'indyRP2', joint_limit = True, constraint_visualization = True):
+    def connect(self, robot_name = 'indy7_v2', joint_limit=True, constraint_visualization=True):
         """
         Connect to Pybullet GUI
+
+        :param string robot_name: robot name want to import, defaults to 'indy7_v2'
+        :param bool joint_limit: activate/deactivate the joint limit constraint, defaults to True
+        :param bool constraint_visualization: activate/deactivate the constraint visualizer, defaults to True
         """
 
         # Open GUI
@@ -88,6 +90,9 @@ class PybulletCore:
         # Import robot
         self.my_robot = PybulletRobot(ClientId=self.ClientId, robot_info=robot_info, dt=self.dt)
 
+        # Debug Frame buffer
+        self._debug_frame_buff_list = []
+
         # Run core thread
         self.__isSimulation = False
         self._thread = Thread(target=self._thread_main)
@@ -108,7 +113,7 @@ class PybulletCore:
 
     def _thread_main(self):
         """
-        Disconnect to Pybullet GUI
+        Core thread of pybullet simulation framework
         """
         while True:
             ts = time.time()
@@ -126,20 +131,77 @@ class PybulletCore:
                 time.sleep(self.dt-tf+ts)
 
     def _thread_pre(self):
+        """
+        This method is called at the beginning of _thread_main.
+        """
         pass
 
     def _thread_post(self):
+        """
+        This method is called at the end of _thread_main.
+        """
         pass
+
+    # Debug Frame
+    def add_debug_frames(self, Tlist):
+
+        if len(Tlist) > len(self._debug_frame_buff_list):
+            for _ in range(len(Tlist) - len(self._debug_frame_buff_list)):
+                self._debug_frame_buff_list.append(DebugFrame(self.ClientId))
+        elif len(Tlist) < len(self._debug_frame_buff_list):
+            for i in range(len(self._debug_frame_buff_list) - len(Tlist)):
+                self._debug_frame_buff_list[len(Tlist) + i].setPos([0, 0, -1], [0, 0, 0])
+
+        for i, T in enumerate(Tlist):
+            self._debug_frame_buff_list[i].setSE3(T)
+
+    def destroy_debug_frames(self):
+        for i in range(len(self._debug_frame_buff_list)):
+            self._debug_frame_buff_list[0].remove()
+            self._debug_frame_buff_list.pop(0)
     
     # For jupyter notebook
-    def MoveRobot(self, angle, degrees=True, verbose=False):
-        
-        if degrees:
-            angle = deg2radlist(angle)
+    def MoveRobot(self, q, degree=True, verbose=False):
+        """
+        Move the robot to the given joint angle
+        """
 
-        self.my_robot.reset_joint_pos(angle)
+        if degree:
+            q = deg2radlist(q)
+
+        self.my_robot.set_desired_joint_pos(q)
 
         if (verbose == True):
             PRINT_BLUE("***** Set desired joint angle *****")
-            print(np.asarray(angle).reshape(-1))
-    
+            print(np.asarray(q).reshape(-1))
+
+
+class DebugFrame:
+    def __init__(self, ClientId, lineWidth=3):
+
+        self.ClientId = ClientId
+
+        visualShapeId = p.createVisualShape(shapeType=p.GEOM_SPHERE, radius=0.01, rgbaColor=[0, 0.5, 0.5, 0.45])
+
+        self._endID = p.createMultiBody(baseVisualShapeIndex=visualShapeId, basePosition=[0, 0, -1],
+                                        baseOrientation=[0, 0, 0], physicsClientId=self.ClientId)
+
+        self._endID_x = p.addUserDebugLine(lineFromXYZ=[0, 0, 0], lineToXYZ=[0.08, 0, 0], lineColorRGB=[1, 0, 0],
+                                           lineWidth=lineWidth, parentObjectUniqueId=self._endID,
+                                           physicsClientId=self.ClientId)
+        self._endID_y = p.addUserDebugLine(lineFromXYZ=[0, 0, 0], lineToXYZ=[0, 0.08, 0], lineColorRGB=[0, 1, 0],
+                                           lineWidth=lineWidth, parentObjectUniqueId=self._endID,
+                                           physicsClientId=self.ClientId)
+        self._endID_z = p.addUserDebugLine(lineFromXYZ=[0, 0, 0], lineToXYZ=[0, 0, 0.08], lineColorRGB=[0, 0, 1],
+                                           lineWidth=lineWidth, parentObjectUniqueId=self._endID,
+                                           physicsClientId=self.ClientId)
+
+    def setSE3(self, T):
+        p.resetBasePositionAndOrientation(bodyUniqueId=self._endID, posObj=T[0:3, 3],
+                                          ornObj=Rot2quat(T[0:3, 0:3]), physicsClientId=self.ClientId)
+
+    def setPos(self, pos, ori):
+        self.setSE3(xyzeul2SE3(pos, ori))
+
+    def remove(self):
+        p.removeBody(bodyUniqueId=self._endID, physicsClientId=self.ClientId)

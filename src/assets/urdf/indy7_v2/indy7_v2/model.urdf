@@ -216,7 +216,7 @@
     <limit effort="78.53981633974483" lower="-3.75245789179" upper="3.75245789179" velocity="0.7853981633974483"/>
   </joint>
 
-  <joint name="tcp" type="fixed">
+  <joint name="indy0_joint_tcp" type="fixed">
     <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.06"/>
     <axis xyz="0.0 0.0 1.0"/>
     <parent link="indy0_link6"/>
