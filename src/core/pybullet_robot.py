@@ -322,9 +322,10 @@ class PybulletRobot:
 
     def _compute_torque_input(self):
 
+        # You need to implement robot controllers here!
         if True:
-            Kp = 5000
-            Kd = 200
+            Kp = 500
+            Kd = 20
 
             qddot = self._qddot_des + Kp * (self._q_des - self._q) + Kd * (self._qdot_des - self._qdot)
 
@@ -591,29 +592,29 @@ class PybulletRobot:
                                     physicsClientId=self.ClientId)
 
     # Kinematics utils
-    def spatial_jacobian(self, q):
-        # Implement this function!
-        """
-        :param np.ndarray q: given robot joint position (rad)
-
-        :return: spatial jacobian in given configuration
-        :rtype: np.ndarray (6-by-n)
-        """
-
-        Js = np.zeros([6, self.numJoints])
-        return Js
-
-    def body_jacobian(self, q):
-        # Implement this function!
-        """
-        :param np.ndarray q: given robot joint position (rad)
-
-        :return: body jacobian in given configuration
-        :rtype: np.ndarray (6-by-n)
-        """
-
-        Jb = np.zeros([6, self.numJoints])
-        return Jb
+    # def spatial_jacobian(self, q):
+    #     # Implement this function!
+    #     """
+    #     :param np.ndarray q: given robot joint position (rad)
+    #
+    #     :return: spatial jacobian in given configuration
+    #     :rtype: np.ndarray (6-by-n)
+    #     """
+    #
+    #     Js = np.zeros([6, self.numJoints])
+    #     return Js
+    #
+    # def body_jacobian(self, q):
+    #     # Implement this function!
+    #     """
+    #     :param np.ndarray q: given robot joint position (rad)
+    #
+    #     :return: body jacobian in given configuration
+    #     :rtype: np.ndarray (6-by-n)
+    #     """
+    #
+    #     Jb = np.zeros([6, self.numJoints])
+    #     return Jb
 
     def jacobian(self, q):
         # Implement this function!
@@ -650,14 +651,6 @@ class PybulletRobot:
         return q
 
     # control utils
-    def reset_joint_pos(self, q_des):
+    def set_desired_joint_pos(self, q_des):
         q_des = np.asarray(q_des).reshape(-1, 1)
         self._q_des = q_des
-
-    def move_joint_pos(self, q_des):
-        # Implement this function!
-        pass
-
-    def move_task_pos(self, T_des):
-        # Implement this function!
-        pass

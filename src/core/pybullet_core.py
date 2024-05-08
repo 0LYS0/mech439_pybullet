@@ -77,7 +77,7 @@ class PybulletCore:
         p.setTimeStep(self.dt)
 
         # Add plane
-        # self.planeId = p.loadURDF("plane.urdf")
+        self.planeId = p.loadURDF("plane.urdf")
 
         # Define robot's information
         robot_info = {"robot_name":None, "robot_position":None, "robot_orientation":None, "robot_properties":{}}
@@ -169,7 +169,7 @@ class PybulletCore:
         if degree:
             q = deg2radlist(q)
 
-        self.my_robot.reset_joint_pos(q)
+        self.my_robot.set_desired_joint_pos(q)
 
         if (verbose == True):
             PRINT_BLUE("***** Set desired joint angle *****")

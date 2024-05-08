@@ -9,9 +9,9 @@ ___
 ## Installation Guide
 1. Create conda environment.
 ```shell
-$ conda create -n <ENV_NAME> python==3.8    # create virtual environment
+$ conda create -n <ENV_NAME> python=3.8    # create virtual environment
 $ conda activate <ENV_NAME>
-$ pip install -r requirements.txt           # install dependancies
+$ pip install -r requirements.txt           # install dependencies
 $ conda install pinocchio -c conda-forge    # install pinocchio (Rigid Body Dynamics Library)
 ```
 ---
