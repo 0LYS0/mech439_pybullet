@@ -5,6 +5,8 @@ jupyter
 pybullet
 
 neuromeka
+pyrealsense2
+opencv-contrib-python
 
 sphinx
 sphinx_rtd_theme
